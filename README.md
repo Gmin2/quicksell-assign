@@ -1,6 +1,6 @@
 # Assignment for the quicksell frontend role 
 
-> !Note: This assignment code is in `https://github.com/Gmin2/quicksell-assign and deployed in `
+> !Note: This assignment code is in `https://github.com/Gmin2/quicksell-assign and deployed in https://quicksell-assign-six.vercel.app/`
 
 Apart from the instruction given in the assignment (image, not the requirements, have done requirements same as it is), I have done few things differently 
 
