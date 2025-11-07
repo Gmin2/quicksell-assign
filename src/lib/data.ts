@@ -28,11 +28,6 @@ const lastNames = [
     'Rathore', 'Arora', 'Mohd', 'Raj', 'Tripathi', 'Saikia', 'Meena'
 ]
 
-// some common themes that i can think of atm
-const addedByUsers = [
-  'Admin', 'Sales Team', 'Marketing', 'Support', 'System', 'Import Tool', 'Mobile App', 'Web Form'
-];
-
 // generate a random customer from randomly picking firstnames and lastnames from the array that I have created above 
 function generateCustomer(id: number): Customer {
   const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
@@ -42,8 +37,8 @@ function generateCustomer(id: number): Customer {
   // generate email from name
   const email = `${firstName?.toLowerCase()}.${lastName?.toLowerCase()}${id}@example.com`;
   
-  // generate phone number
-  const phone = `+91 (${Math.floor(Math.random() * 900 + 100)}) ${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 9000 + 1000)}`;
+  // generate phone number 
+  const phone = `+91 ${Math.floor(Math.random() * 10000000000)}`;
   
   // generate score (0-100)
   const score = Math.floor(Math.random() * 101);
@@ -53,8 +48,7 @@ function generateCustomer(id: number): Customer {
     Date.now() - Math.floor(Math.random() * 730 * 24 * 60 * 60 * 1000)
   );
   
-  // random added by
-  const addedBy = addedByUsers[Math.floor(Math.random() * addedByUsers.length)]!;
+  const addedBy = `${firstName} ${lastName}`;
   
   // generate avatar using DiceBear API
   const avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;

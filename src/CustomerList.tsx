@@ -5,8 +5,8 @@ import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import Logo from './assets/Doubletick Logo.png'
 import SearchIcon from './assets/test_Search-3.svg'
 import FilterIcon from './assets/test_Filter.svg'
-import AvatarFallbackAsset from './assets/test_user-3 3.svg'
-import './index.css'
+import CustomerRow from './CustomerRow';
+import CustomerHeader from './CustomerHeader';
 
 type SortField = 'name' | 'email' | 'phone' | 'score' | 'lastMessageAt' | 'addedBy';
 type SortOrder = 'asc' | 'desc' | null;
@@ -21,6 +21,9 @@ export default function CustomersList({ customers }: CustomerListProps) {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>(null);
+  const [loadedCount, setLoadedCount] = useState(30); // 30 rows per page
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [selected, setSelected] = useState<Record<number, boolean>>({});
 
   // reference for the scrollable container
   const parentRef = useRef<HTMLDivElement>(null);
@@ -30,7 +33,7 @@ export default function CustomersList({ customers }: CustomerListProps) {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Filter and sort customers
+  // filter and sort customers
   const filteredAndSortedCustomers = useMemo(() => {
     let result = [...customers];
 
@@ -65,7 +68,7 @@ export default function CustomersList({ customers }: CustomerListProps) {
     return result;
   }, [customers, debouncedSearch, sortField, sortOrder]);
 
-  // Handle sorting when header clicked
+  // handle sorting when header clicked
   const handleSort = useCallback((field: SortField) => {
     if (sortField === field) {
       if (sortOrder === 'asc') setSortOrder('desc');
@@ -75,13 +78,60 @@ export default function CustomersList({ customers }: CustomerListProps) {
     }
   }, [sortField, sortOrder]);
 
-  // Virtualizer setup
+  // pagination: 30 rows per page, load more on scroll
+  useEffect(() => {
+    setLoadedCount(30);
+  }, [filteredAndSortedCustomers.length]);
+
+  const displayedCustomers = filteredAndSortedCustomers.slice(0, loadedCount);
+
+  // virtualizer setup for displayed items
   const rowVirtualizer = useVirtualizer({
-    count: filteredAndSortedCustomers.length,
+    count: displayedCustomers.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 60,
-    overscan: 10,
+    estimateSize: () => 64,
+    overscan: 6,
   });
+
+  // load more on scroll (when near bottom of scroll container)
+  useEffect(() => {
+    const el = parentRef.current;
+    if (!el) return;
+    let rafId: number | null = null;
+    const onScroll = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const bottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        if (bottom < 400 && loadedCount < filteredAndSortedCustomers.length) {
+          setLoadedCount((c) => Math.min(c + 30, filteredAndSortedCustomers.length));
+        }
+      });
+    };
+    el.addEventListener('scroll', onScroll);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [parentRef, loadedCount, filteredAndSortedCustomers.length]);
+
+  // selection helpers
+  const toggleSelect = (id: number) => setSelected((s) => ({ ...s, [id]: !s[id] }));
+  const selectAll = () => {
+    const allSelected = displayedCustomers.every((c) => selected[c.id]);
+    if (allSelected) {
+      setSelected((s) => {
+        const copy = { ...s };
+        displayedCustomers.forEach((c) => delete copy[c.id]);
+        return copy;
+      });
+    } else {
+      setSelected((s) => {
+        const copy = { ...s };
+        displayedCustomers.forEach((c) => (copy[c.id] = true));
+        return copy;
+      });
+    }
+  };
 
   const getSortIcon = (field: SortField) => {
     if (sortField !== field) return <ArrowUpDown className="sort-icon" />;
@@ -89,20 +139,24 @@ export default function CustomersList({ customers }: CustomerListProps) {
     return <ArrowDown className="sort-icon" />;
   };
 
-  const formatDate = (date: Date) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
   return (
     <div className="cl-root">
       {/* Header */}
       <div className="cl-header">
         <div className="cl-container">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <img src={Logo} alt="DoubleTick" className="cl-logo" />
-            <div>
+          <div className="cl-header-grid">
+            <div className="cl-logo-col">
+              <img src={Logo} alt="DoubleTick" className="cl-logo" />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h1 className="cl-title">DoubleTick</h1>
-                <span className="cl-count-pill">{filteredAndSortedCustomers.length.toLocaleString()}</span>
+                <div className="cl-all-customers">All Customers</div>
+                <span className='score-badge'>
+                      {filteredAndSortedCustomers.length.toLocaleString()}
+                </span>
+                
+                {/* <span className="cl-count-pill">{filteredAndSortedCustomers.length.toLocaleString()}</span> */}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>All Customers</div>
+            </div>
+            <div className="cl-title-col">
             </div>
           </div>
 
@@ -119,11 +173,21 @@ export default function CustomersList({ customers }: CustomerListProps) {
               />
             </div>
 
-            {/* Simple select-based filters (placeholder) */}
-            <button className="cl-filter-btn">
-              <img src={FilterIcon} alt="filter" style={{ width: 16, height: 16, marginRight: 8 }} />
-              Add Filters
-            </button>
+            {/* Filters dropdown (static only) */}
+            <div style={{ position: 'relative' }}>
+              <button className="cl-filter-btn" onClick={() => setFiltersOpen((s) => !s)}>
+                <img src={FilterIcon} alt="filter" style={{ width: 16, height: 16 }} />
+                <span style={{ marginLeft: 8 }}>Add Filters</span>
+              </button>
+              {filtersOpen && (
+                <div className="cl-filter-menu" role="menu">
+                  <div className="cl-filter-item">Filter 1</div>
+                  <div className="cl-filter-item">Filter 2</div>
+                  <div className="cl-filter-item">Filter 3</div>
+                  <div className="cl-filter-item">Filter 4</div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Results count */}
@@ -135,62 +199,23 @@ export default function CustomersList({ customers }: CustomerListProps) {
       <div ref={parentRef} className="cl-table-wrap" style={{ contain: 'strict' }}>
         <div className="cl-table-card">
           {/* Header row (sticky) */}
-          <div className="cl-header-row">
-            <div className="cl-col-id"><span className="cl-col-btn">ID</span></div>
-            <div className="cl-col-name"><button onClick={() => handleSort('name')} className="cl-col-btn">Name <span className="sort-icon">{getSortIcon('name')}</span></button></div>
-            <div className="cl-col-email"><button onClick={() => handleSort('email')} className="cl-col-btn">Email <span className="sort-icon">{getSortIcon('email')}</span></button></div>
-            <div className="cl-col-phone"><button onClick={() => handleSort('phone')} className="cl-col-btn">Phone <span className="sort-icon">{getSortIcon('phone')}</span></button></div>
-            <div className="cl-col-score"><button onClick={() => handleSort('score')} className="cl-col-btn">Score <span className="sort-icon">{getSortIcon('score')}</span></button></div>
-            <div className="cl-col-last"><button onClick={() => handleSort('lastMessageAt')} className="cl-col-btn">Last Message <span className="sort-icon">{getSortIcon('lastMessageAt')}</span></button></div>
-            <div className="cl-col-added"><button onClick={() => handleSort('addedBy')} className="cl-col-btn">Added By <span className="sort-icon">{getSortIcon('addedBy')}</span></button></div>
-          </div>
+          <CustomerHeader handleSort={handleSort} getSortIcon={getSortIcon} selectAll={selectAll} />
 
           <div className="cl-table-body">
             {/* Spacer to make scrollbar size match total virtualized height */}
             <div className="cl-spacer" style={{ height: `${rowVirtualizer.getTotalSize()}px` }} />
 
             {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const customer = filteredAndSortedCustomers[virtualRow.index];
+              const customer = displayedCustomers[virtualRow.index];
               return (
-                <div
+                <CustomerRow
                   key={customer.id}
                   ref={rowVirtualizer.measureElement}
-                  className="cl-row"
-                  data-index={virtualRow.index}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
-                >
-                  <div className="cl-col-id cl-cell">#{customer.id}</div>
-                  <div className="cl-col-name cl-cell">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div className="avatar">
-                        <img
-                          src={customer.avatar}
-                          alt={customer.name}
-                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = AvatarFallbackAsset }}
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{customer.name}</span>
-                        <span style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{customer.phone}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="cl-col-email cl-cell">{customer.email}</div>
-                  <div className="cl-col-phone cl-cell">{customer.phone}</div>
-                  <div className="cl-col-score cl-cell">
-                    <span className={`score-badge ${customer.score >= 80 ? 'score-high' : customer.score >= 50 ? 'score-mid' : 'score-low'}`}>
-                      {customer.score}
-                    </span>
-                  </div>
-                  <div className="cl-col-last cl-cell">{formatDate(customer.lastMessageAt)}</div>
-                  <div className="cl-col-added cl-cell">{customer.addedBy}</div>
-                </div>
+                  customer={customer}
+                  isSelected={!!selected[customer.id]}
+                  onToggleSelect={toggleSelect}
+                  style={{ transform: `translateY(${virtualRow.start}px)` }}
+                />
               );
             })}
           </div>

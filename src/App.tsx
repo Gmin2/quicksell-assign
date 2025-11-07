@@ -4,7 +4,7 @@ import CustomersList from './CustomerList'
 import { generateCustomers } from './lib/data'
 
 function App() {
-  const customers = useMemo(() => generateCustomers(1000), [])
+  const customers = useMemo(() => generateCustomers(1000000), [])
 
   return (
     <div className="App">
